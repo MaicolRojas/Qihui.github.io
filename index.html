@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qihui - Calculadora de Inversiones</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="main-container">
+        <header class="header">
+            <div class="logo">
+                <img src="https://data.qihui365.xyz/h5/static/images/logo.png" class="logo-icon" alt="Logo Qihui">
+                Qihui
+            </div>
+        </header>
+
+        <nav class="tab-bar">
+            <button class="tab-button active" data-tab="tab1">Cálculo por Días</button>
+            <button class="tab-button" data-tab="tab2">Cálculo por Meta</button>
+        </nav>
+
+        <!-- Sección por Días -->
+        <section class="form-section active" id="tab1">
+            <div class="input-group">
+                <label>Inversión Inicial (COP)</label>
+                <input type="text" class="input-field" id="inversion" placeholder="Ej: 1,000,000" oninput="formatearMoneda(this)">
+            </div>
+            
+            <div class="input-group">
+                <label>Período de Inversión (Días)</label>
+                <input type="number" class="input-field" id="dias" placeholder="Ej: 30">
+            </div>
+
+            <button class="primary-btn" onclick="calcularInversion()">
+                <i class="fas fa-chart-line"></i>
+                Calcular Por Dias
+            </button>
+        </section>
+
+        <!-- Sección por Meta -->
+        <section class="form-section" id="tab2">
+            <div class="input-group">
+                <label>Capital Inicial (COP)</label>
+                <input type="text" class="input-field" id="inversion-meta" placeholder="Ej: 1,000,000" oninput="formatearMoneda(this)">
+            </div>
+            
+            <div class="input-group">
+                <label>Meta Financiera (COP)</label>
+                <input type="text" class="input-field" id="meta" placeholder="Ej: 5,000,000" oninput="formatearMoneda(this)">
+            </div>
+
+            <button class="primary-btn" onclick="calcularTiempoMeta()">
+                <i class="fas fa-bullseye"></i>
+                Calcular Por Meta
+            </button>
+        </section>
+
+        <!-- Selector de Vista -->
+        <div class="view-selector">
+            <button class="view-button active" data-view="tabla">Tabla De Inversión</button>
+            <button class="view-button" data-view="grafico">Gráfico de Barras</button>
+        </div>
+
+        <!-- Resultados -->
+        <div class="results-container" id="tablaResultados">
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Día</th>
+                        <th>Inversión</th>
+                        <th>Profit 1</th>
+                        <th>Profit 2</th>
+                        <th>Profit 3</th>
+                        <th>Ganancia</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Filas generadas dinámicamente -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Gráfico de línea -->
+        <div class="variacion-inversion" id="graficoVariacion">
+            <div id="chartContainer">
+                <canvas id="investmentChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Resumen -->
+        <div class="results-summary">
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <h4>Inversión Total</h4>
+                    <p id="inversion-total">$ 0</p>
+                </div>
+                <div class="summary-item">
+                    <h4>Ganancias Totales</h4>
+                    <p id="ganancias-totales">$ 0</p>
+                </div>
+                <div class="summary-item">
+                    <h4>Días Requeridos</h4>
+                    <p id="dias-requeridos">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico circular -->
+        <div class="pie-chart-container">
+            <h3>Distribución: Inversión, Ganancias. </h3>
+            <canvas id="pieChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-card">
+            <i class="fas fa-chart-pie modal-icon" id="modalIcon"></i>
+            <h2 class="modal-title" id="modalTitle"></h2>
+            <div class="modal-content" id="modalContent"></div>
+            <button class="primary-btn" onclick="closeModal()">Aceptar</button>
+        </div>
+    </div>
+</body>
+</html>
