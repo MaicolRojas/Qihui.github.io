@@ -7,6 +7,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+
     <style>
         :root {
             --primary: #2F80ED;
@@ -16,6 +21,7 @@
             --text-secondary: #64748B;
             --border: #E2E8F0;
             --success: #4CAF50;
+            --error: #e53e3e;
             --table-row-even: #F8FAFC;
         }
 
@@ -26,6 +32,7 @@
             --text-secondary: #cccccc;
             --border: #404040;
             --success: #81C784;
+            --error: #ff4444;
             --table-row-even: #2d2d2d;
         }
 
@@ -163,6 +170,18 @@
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(47, 128, 237, 0.1);
+        }
+
+        .input-field.invalid {
+            border-color: var(--error);
+            box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.1);
+        }
+
+        .error-message {
+            color: var(--error);
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+            display: none;
         }
 
         .primary-btn {
@@ -344,9 +363,56 @@
             font-size: 1.1rem;
         }
 
+        .export-buttons {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 2rem;
+            justify-content: flex-end;
+        }
+
+        .loader {
+            border: 4px solid var(--border);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 2rem auto;
+            display: none;
+        }
+
+        .simulations-history {
+            margin-top: 2rem;
+            border-top: 1px solid var(--border);
+            padding: 1rem;
+        }
+
+        .history-item {
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            background: var(--background);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-item:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateX(5px);
+        }
+
         @keyframes modalSlideIn {
             from { transform: translateY(-20px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         @media (max-width: 768px) {
@@ -401,11 +467,19 @@
             <div class="input-group">
                 <label>Inversión Inicial (COP)</label>
                 <input type="text" class="input-field" id="inversion" placeholder="Ej: 1,000,000" oninput="formatearMoneda(this)">
+                <div class="error-message" id="inversion-error"></div>
             </div>
             
             <div class="input-group">
                 <label>Período de Inversión (Días)</label>
                 <input type="number" class="input-field" id="dias" placeholder="Ej: 30">
+                <div class="error-message" id="dias-error"></div>
+            </div>
+
+            <div class="input-group">
+                <label>Tasa de Profit Diaria (%)</label>
+                <input type="number" class="input-field" id="profit-rate" step="0.01" value="0.58">
+                <div class="error-message" id="profit-rate-error"></div>
             </div>
 
             <button class="primary-btn" onclick="calcularInversion()">
@@ -419,11 +493,19 @@
             <div class="input-group">
                 <label>Capital Inicial (COP)</label>
                 <input type="text" class="input-field" id="inversion-meta" placeholder="Ej: 1,000,000" oninput="formatearMoneda(this)">
+                <div class="error-message" id="inversion-meta-error"></div>
             </div>
             
             <div class="input-group">
                 <label>Meta Financiera (COP)</label>
                 <input type="text" class="input-field" id="meta" placeholder="Ej: 5,000,000" oninput="formatearMoneda(this)">
+                <div class="error-message" id="meta-error"></div>
+            </div>
+
+            <div class="input-group">
+                <label>Tasa de Profit Diaria (%)</label>
+                <input type="number" class="input-field" id="profit-rate-meta" step="0.01" value="0.58">
+                <div class="error-message" id="profit-rate-meta-error"></div>
             </div>
 
             <button class="primary-btn" onclick="calcularTiempoMeta()">
@@ -432,11 +514,22 @@
             </button>
         </section>
 
-        <!-- Selector de Vista -->
+        <!-- Controles -->
         <div class="view-selector">
             <button class="view-button active" data-view="tabla">Tabla De Inversión</button>
             <button class="view-button" data-view="grafico">Gráfico de Barras</button>
         </div>
+
+        <div class="export-buttons">
+            <button class="primary-btn" onclick="exportPDF()">
+                <i class="fas fa-file-pdf"></i> PDF
+            </button>
+            <button class="primary-btn" onclick="exportExcel()">
+                <i class="fas fa-file-excel"></i> Excel
+            </button>
+        </div>
+
+        <div class="loader" id="loadingSpinner"></div>
 
         <!-- Resultados -->
         <div class="results-container" id="tablaResultados">
@@ -458,7 +551,7 @@
             </table>
         </div>
 
-        <!-- Gráfico de línea -->
+        <!-- Gráficos -->
         <div class="variacion-inversion" id="graficoVariacion">
             <div id="chartContainer">
                 <canvas id="investmentChart"></canvas>
@@ -485,40 +578,51 @@
 
         <!-- Gráfico circular -->
         <div class="pie-chart-container">
-            <h3>Distribución: Inversión, Ganancias. </h3>
+            <h3>Distribución: Inversión vs Ganancias</h3>
             <canvas id="pieChart"></canvas>
         </div>
-    </div>
 
-    <!-- Modal -->
-    <div class="modal-overlay" id="modalOverlay">
-        <div class="modal-card">
-            <i class="fas fa-chart-pie modal-icon" id="modalIcon"></i>
-            <h2 class="modal-title" id="modalTitle"></h2>
-            <div class="modal-content" id="modalContent"></div>
-            <button class="primary-btn" onclick="closeModal()">Aceptar</button>
+        <!-- Historial -->
+        <div class="simulations-history">
+            <h3>Historial de Simulaciones</h3>
+            <div id="historyList"></div>
+        </div>
+
+        <!-- Modal -->
+        <div class="modal-overlay" id="modalOverlay">
+            <div class="modal-card">
+                <i class="fas fa-chart-pie modal-icon" id="modalIcon"></i>
+                <h2 class="modal-title" id="modalTitle"></h2>
+                <div class="modal-content" id="modalContent"></div>
+                <button class="primary-btn" onclick="closeModal()">Aceptar</button>
+            </div>
         </div>
     </div>
-
     <script>
+        let hasCalculations = false;
         let myChart = null;
         let pieChart = null;
-        let hasCalculations = false;
-        let chartLabels = [];
-        let chartData = [];
-        let pieDataInversion = 0;
-        let pieDataGanancias = 0;
-
-        // Manejar tema al cargar
+        let currentSimulation = null;
+        const MAX_HISTORY = 5;
+        
         document.addEventListener('DOMContentLoaded', function() {
             const savedTheme = localStorage.getItem('theme');
             if (savedTheme === 'dark') {
                 document.body.classList.add('dark-mode');
                 document.getElementById('themeToggle').querySelector('i').className = 'fas fa-sun';
             }
+            updateHistory();
+            
+            document.querySelectorAll('.input-field').forEach(input => {
+                input.addEventListener('input', () => {
+                    if (input.classList.contains('invalid')) {
+                        input.classList.remove('invalid');
+                        document.getElementById(`${input.id}-error`).style.display = 'none';
+                    }
+                });
+            });
         });
-
-        // Toggle del tema
+        
         document.getElementById('themeToggle').addEventListener('click', function() {
             document.body.classList.toggle('dark-mode');
             const isDarkMode = document.body.classList.contains('dark-mode');
@@ -526,19 +630,16 @@
             const icon = this.querySelector('i');
             icon.className = isDarkMode ? 'fas fa-sun' : 'fas fa-moon';
             
-            if (hasCalculations) {
-                if (myChart) {
-                    myChart.destroy();
-                    updateChart(chartLabels, chartData);
-                }
-                if (pieChart) {
-                    pieChart.destroy();
-                    updatePieChart(pieDataInversion, pieDataGanancias);
-                }
+            if (myChart) {
+                myChart.destroy();
+                updateChart(chartLabels, chartData);
+            }
+            if (pieChart) {
+                pieChart.destroy();
+                updatePieChart(pieDataInversion, pieDataGanancias);
             }
         });
-
-        // Manejar cambio de pestañas
+        
         document.querySelectorAll('.tab-button').forEach(button => {
             button.addEventListener('click', () => {
                 const tabId = button.dataset.tab;
@@ -546,12 +647,21 @@
                 document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
                 button.classList.add('active');
                 document.getElementById(tabId).classList.add('active');
-                
-                // Resetear resultados
                 resetResults();
             });
         });
-
+        
+        document.querySelectorAll('.view-button').forEach(button => {
+            button.addEventListener('click', () => {
+                if(!hasCalculations) return;
+                const view = button.dataset.view;
+                document.querySelectorAll('.view-button').forEach(b => b.classList.remove('active'));
+                button.classList.add('active');
+                document.getElementById('tablaResultados').style.display = view === 'tabla' ? 'block' : 'none';
+                document.getElementById('graficoVariacion').style.display = view === 'grafico' ? 'block' : 'none';
+            });
+        });
+        
         function resetResults() {
             hasCalculations = false;
             document.querySelector('.view-selector').style.display = 'none';
@@ -563,15 +673,13 @@
             if(myChart) myChart.destroy();
             if(pieChart) pieChart.destroy();
         }
-
-        // Formatear moneda en inputs
+        
         function formatearMoneda(input) {
             let valor = input.value.replace(/[^\d]/g, '');
             if(valor === '') {
                 input.value = '';
                 return;
             }
-            
             const numero = Number(valor);
             input.value = numero.toLocaleString('es-CO', {
                 style: 'currency',
@@ -580,13 +688,174 @@
                 maximumFractionDigits: 0
             });
         }
-
-        // Convertir a número
+        
         function convertirANumero(valorFormateado) {
             return Number(valorFormateado.replace(/[^\d]/g, '')) || 0;
         }
-
-        // Actualizar gráfico de línea
+        
+        function formatearMonedaTabla(valor) {
+            return valor.toLocaleString('es-CO', {
+                style: 'currency',
+                currency: 'COP',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            });
+        }
+        
+        function validarFormulario(tipo) {
+            const campos = {
+                dias: ['inversion', 'dias', 'profit-rate'],
+                meta: ['inversion-meta', 'meta', 'profit-rate-meta']
+            }[tipo];
+        
+            let valido = true;
+            campos.forEach(id => {
+                const input = document.getElementById(id);
+                const error = document.getElementById(`${id}-error`);
+                
+                if (!input.value || (input.type === 'number' && Number(input.value) <= 0)) {
+                    input.classList.add('invalid');
+                    error.textContent = 'Campo requerido';
+                    error.style.display = 'block';
+                    valido = false;
+                } else {
+                    input.classList.remove('invalid');
+                    error.style.display = 'none';
+                }
+            });
+            return valido;
+        }
+        
+        function calcularInversion() {
+            if (!validarFormulario('dias')) return;
+            showLoader();
+            
+            const inversionInicial = convertirANumero(document.getElementById("inversion").value);
+            const dias = parseInt(document.getElementById("dias").value);
+            const profitDiario = parseFloat(document.getElementById("profit-rate").value) / 100;
+        
+            const tbody = document.querySelector("#tablaResultados tbody");
+            tbody.innerHTML = "";
+            
+            let saldo = inversionInicial;
+            let gananciasTotales = 0;
+            const labels = [];
+            const data = [];
+        
+            for (let dia = 1; dia <= dias; dia++) {
+                const profit1 = saldo * profitDiario;
+                const profit2 = (saldo + profit1) * profitDiario;
+                const profit3 = (saldo + profit1 + profit2) * profitDiario;
+                const totalGanadoDia = profit1 + profit2 + profit3;
+                saldo += totalGanadoDia;
+                gananciasTotales += totalGanadoDia;
+        
+                labels.push(`Día ${dia}`);
+                data.push(saldo);
+        
+                const fila = document.createElement("tr");
+                fila.innerHTML = `
+                    <td>${dia}</td>
+                    <td>${formatearMonedaTabla(inversionInicial)}</td>
+                    <td>${formatearMonedaTabla(profit1)}</td>
+                    <td>${formatearMonedaTabla(profit2)}</td>
+                    <td>${formatearMonedaTabla(profit3)}</td>
+                    <td>${formatearMonedaTabla(totalGanadoDia)}</td>
+                    <td>${formatearMonedaTabla(saldo)}</td>
+                `;
+                tbody.appendChild(fila);
+            }
+        
+            actualizarUIResultados(saldo, gananciasTotales, dias, labels, data, inversionInicial);
+            guardarEnHistorial({
+                type: 'dias',
+                params: { inversion: inversionInicial, dias, profitRate: profitDiario },
+                results: { total: saldo, ganancias: gananciasTotales }
+            });
+            hideLoader();
+        }
+        
+        function calcularTiempoMeta() {
+            if (!validarFormulario('meta')) return;
+            showLoader();
+            
+            const inversionInicial = convertirANumero(document.getElementById("inversion-meta").value);
+            const meta = convertirANumero(document.getElementById("meta").value);
+            const profitDiario = parseFloat(document.getElementById("profit-rate-meta").value) / 100;
+        
+            if (meta <= inversionInicial) {
+                alert("La meta debe ser mayor al monto inicial");
+                hideLoader();
+                return;
+            }
+        
+            const tbody = document.querySelector("#tablaResultados tbody");
+            tbody.innerHTML = "";
+            
+            let saldo = inversionInicial;
+            let dia = 0;
+            const maxDias = 365 * 50;
+            const labels = [];
+            const data = [];
+            let gananciasTotales = 0;
+        
+            while (saldo < meta && dia < maxDias) {
+                dia++;
+                const profit1 = saldo * profitDiario;
+                const profit2 = (saldo + profit1) * profitDiario;
+                const profit3 = (saldo + profit1 + profit2) * profitDiario;
+                const totalGanadoDia = profit1 + profit2 + profit3;
+                const saldoAnterior = saldo;
+                saldo += totalGanadoDia;
+                gananciasTotales += totalGanadoDia;
+        
+                labels.push(`Día ${dia}`);
+                data.push(saldo);
+        
+                const fila = document.createElement("tr");
+                fila.innerHTML = `
+                    <td>${dia}</td>
+                    <td>${formatearMonedaTabla(saldoAnterior)}</td>
+                    <td>${formatearMonedaTabla(profit1)}</td>
+                    <td>${formatearMonedaTabla(profit2)}</td>
+                    <td>${formatearMonedaTabla(profit3)}</td>
+                    <td>${formatearMonedaTabla(totalGanadoDia)}</td>
+                    <td>${formatearMonedaTabla(saldo)}</td>
+                `;
+                tbody.appendChild(fila);
+            }
+        
+            actualizarUIResultados(saldo, gananciasTotales, dia, labels, data, inversionInicial);
+            guardarEnHistorial({
+                type: 'meta',
+                params: { inversion: inversionInicial, meta, profitRate: profitDiario },
+                results: { total: saldo, ganancias: gananciasTotales }
+            });
+            
+            mostrarModalResultado(saldo >= meta, dia, saldo, maxDias);
+            hideLoader();
+        }
+        
+        function actualizarUIResultados(saldo, ganancias, dias, labels, data, inversionInicial) {
+            hasCalculations = true;
+            document.getElementById("inversion-total").textContent = formatearMonedaTabla(saldo);
+            document.getElementById("ganancias-totales").textContent = formatearMonedaTabla(ganancias);
+            document.getElementById("dias-requeridos").textContent = dias;
+        
+            document.querySelector('.view-selector').style.display = 'flex';
+            document.getElementById('tablaResultados').style.display = 'block';
+            document.querySelector('.results-summary').style.display = 'block';
+            document.querySelector('.pie-chart-container').style.display = 'block';
+        
+            chartLabels = labels;
+            chartData = data;
+            pieDataInversion = inversionInicial;
+            pieDataGanancias = ganancias;
+        
+            updateChart(labels, data);
+            updatePieChart(inversionInicial, ganancias);
+        }
+        
         function updateChart(labels, data) {
             const ctx = document.getElementById('investmentChart').getContext('2d');
             const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
@@ -594,7 +863,7 @@
             const backgroundColor = `rgba(${parseInt(primaryColor.slice(1,3), 16)}, ${parseInt(primaryColor.slice(3,5), 16)}, ${parseInt(primaryColor.slice(5,7), 16)}, 0.1)`;
             
             if(myChart) myChart.destroy();
-
+        
             myChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -654,15 +923,14 @@
                 }
             });
         }
-
-        // Actualizar gráfico circular
+        
         function updatePieChart(inicial, ganancias) {
             const ctx = document.getElementById('pieChart').getContext('2d');
             const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
             const successColor = getComputedStyle(document.documentElement).getPropertyValue('--success').trim();
-
+        
             if(pieChart) pieChart.destroy();
-
+        
             pieChart = new Chart(ctx, {
                 type: 'pie',
                 data: {
@@ -707,148 +975,103 @@
                 }
             });
         }
-
-        // Cálculo por días
-        function calcularInversion() {
-            const inversionInicial = convertirANumero(document.getElementById("inversion").value);
-            const dias = parseInt(document.getElementById("dias").value);
-
-            if (!inversionInicial || !dias) {
-                alert("Complete todos los campos");
-                return;
-            }
-
-            const tbody = document.querySelector("#tablaResultados tbody");
-            tbody.innerHTML = "";
+        
+        function exportPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
             
-            let saldo = inversionInicial;
-            let gananciasTotales = 0;
-            const profitDiario = 0.0058;
-            const labels = [];
-            const data = [];
-
-            for (let dia = 1; dia <= dias; dia++) {
-                const profit1 = saldo * profitDiario;
-                const profit2 = (saldo + profit1) * profitDiario;
-                const profit3 = (saldo + profit1 + profit2) * profitDiario;
-                const totalGanadoDia = profit1 + profit2 + profit3;
-                saldo += totalGanadoDia;
-                gananciasTotales += totalGanadoDia;
-
-                labels.push(`Día ${dia}`);
-                data.push(saldo);
-
-                const fila = document.createElement("tr");
-                fila.innerHTML = `
-                    <td>${dia}</td>
-                    <td>${formatearMonedaTabla(inversionInicial)}</td>
-                    <td>${formatearMonedaTabla(profit1)}</td>
-                    <td>${formatearMonedaTabla(profit2)}</td>
-                    <td>${formatearMonedaTabla(profit3)}</td>
-                    <td>${formatearMonedaTabla(totalGanadoDia)}</td>
-                    <td>${formatearMonedaTabla(saldo)}</td>
-                `;
-                tbody.appendChild(fila);
-            }
-
-            document.getElementById("inversion-total").textContent = formatearMonedaTabla(saldo);
-            document.getElementById("ganancias-totales").textContent = formatearMonedaTabla(gananciasTotales);
-            document.getElementById("dias-requeridos").textContent = dias;
-
-            document.querySelector('.view-selector').style.display = 'flex';
-            document.getElementById('tablaResultados').style.display = 'block';
-            document.querySelector('.results-summary').style.display = 'block';
-            document.querySelector('.pie-chart-container').style.display = 'block';
-            hasCalculations = true;
-
-            chartLabels = labels;
-            chartData = data;
-            pieDataInversion = inversionInicial;
-            pieDataGanancias = gananciasTotales;
-
-            updateChart(labels, data);
-            updatePieChart(inversionInicial, gananciasTotales);
+            doc.text('Reporte de Inversión Qihui', 10, 10);
+            doc.autoTable({
+                html: '.results-table',
+                startY: 20,
+                theme: 'grid',
+                styles: { fontSize: 8 },
+                headStyles: { fillColor: [47, 128, 237] }
+            });
+            
+            doc.save('reporte-inversion.pdf');
         }
-
-        // Cálculo por meta
-        function calcularTiempoMeta() {
-            const inversionInicial = convertirANumero(document.getElementById("inversion-meta").value);
-            const meta = convertirANumero(document.getElementById("meta").value);
+        
+        function exportExcel() {
+            const table = document.querySelector('.results-table');
+            const wb = XLSX.utils.table_to_book(table, {
+                raw: false,
+                dateNF: 'dd/mm/yyyy',
+                cellStyles: true,
+                cellDates: true
+            });
             
-            if (!inversionInicial || !meta) {
-                alert("Complete todos los campos");
-                return;
-            }
-
-            if (meta <= inversionInicial) {
-                alert("La meta debe ser mayor al monto inicial");
-                return;
-            }
-
-            const tbody = document.querySelector("#tablaResultados tbody");
-            tbody.innerHTML = "";
+            // Aplicar formato de moneda a las columnas numéricas
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const range = XLSX.utils.decode_range(ws['!ref']);
             
-            let saldo = inversionInicial;
-            let dia = 0;
-            const profitDiario = 0.0058;
-            const maxDias = 365 * 50;
-            const labels = [];
-            const data = [];
-            let gananciasTotales = 0;
-
-            while (saldo < meta && dia < maxDias) {
-                dia++;
-                const profit1 = saldo * profitDiario;
-                const profit2 = (saldo + profit1) * profitDiario;
-                const profit3 = (saldo + profit1 + profit2) * profitDiario;
-                const totalGanadoDia = profit1 + profit2 + profit3;
-                const saldoAnterior = saldo;
-                saldo += totalGanadoDia;
-                gananciasTotales += totalGanadoDia;
-
-                labels.push(`Día ${dia}`);
-                data.push(saldo);
-
-                const fila = document.createElement("tr");
-                fila.innerHTML = `
-                    <td>${dia}</td>
-                    <td>${formatearMonedaTabla(saldoAnterior)}</td>
-                    <td>${formatearMonedaTabla(profit1)}</td>
-                    <td>${formatearMonedaTabla(profit2)}</td>
-                    <td>${formatearMonedaTabla(profit3)}</td>
-                    <td>${formatearMonedaTabla(totalGanadoDia)}</td>
-                    <td>${formatearMonedaTabla(saldo)}</td>
+            for (let C = 1; C <= range.e.c; C++) { // Saltar columna Día (C=0)
+                for (let R = 1; R <= range.e.r; R++) {
+                    const cell = ws[XLSX.utils.encode_cell({r: R, c: C})];
+                    if (cell && cell.t === 'n') {
+                        cell.z = '"$"#,##0.00;[Red]"$-"#,##0.00';
+                    }
+                }
+            }
+            
+            XLSX.writeFile(wb, 'reporte-inversion.xlsx');
+        }
+        
+        function guardarEnHistorial(simulacion) {
+            const history = JSON.parse(localStorage.getItem('investmentHistory') || '[]');
+            history.unshift(simulacion);
+            if (history.length > MAX_HISTORY) history.pop();
+            localStorage.setItem('investmentHistory', JSON.stringify(history));
+            updateHistory();
+        }
+        
+        function updateHistory() {
+            const history = JSON.parse(localStorage.getItem('investmentHistory') || '[]');
+            const list = document.getElementById('historyList');
+            list.innerHTML = '';
+            
+            history.forEach((sim, index) => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `
+                    <div>
+                        <small>${new Date().toLocaleDateString()}</small>
+                        <div>${sim.type === 'dias' ? 'Cálculo por días' : 'Cálculo por meta'}</div>
+                    </div>
+                    <div>${formatearMonedaTabla(sim.results.total)}</div>
                 `;
-                tbody.appendChild(fila);
+                div.onclick = () => cargarSimulacion(index);
+                list.appendChild(div);
+            });
+        }
+        
+        function cargarSimulacion(index) {
+            const history = JSON.parse(localStorage.getItem('investmentHistory'));
+            const sim = history[index];
+            
+            if (sim.type === 'dias') {
+                document.getElementById('inversion').value = sim.params.inversion.toLocaleString('es-CO');
+                document.getElementById('dias').value = sim.params.dias;
+                document.getElementById('profit-rate').value = (sim.params.profitRate * 100).toFixed(2);
+                calcularInversion();
+            } else {
+                document.getElementById('inversion-meta').value = sim.params.inversion.toLocaleString('es-CO');
+                document.getElementById('meta').value = sim.params.meta.toLocaleString('es-CO');
+                document.getElementById('profit-rate-meta').value = (sim.params.profitRate * 100).toFixed(2);
+                calcularTiempoMeta();
             }
-
-            document.getElementById("inversion-total").textContent = formatearMonedaTabla(saldo);
-            document.getElementById("ganancias-totales").textContent = formatearMonedaTabla(gananciasTotales);
-            document.getElementById("dias-requeridos").textContent = dia;
-
-            document.querySelector('.view-selector').style.display = 'flex';
-            document.getElementById('tablaResultados').style.display = 'block';
-            document.querySelector('.results-summary').style.display = 'block';
-            document.querySelector('.pie-chart-container').style.display = 'block';
-            hasCalculations = true;
-
-            chartLabels = labels;
-            chartData = data;
-            pieDataInversion = inversionInicial;
-            pieDataGanancias = gananciasTotales;
-
-            updateChart(labels, data);
-            updatePieChart(inversionInicial, gananciasTotales);
-
+        }
+        
+        function mostrarModalResultado(exito, dias, saldo, maxDias) {
             const modalIcon = document.getElementById('modalIcon');
             const modalTitle = document.getElementById('modalTitle');
             const modalContent = document.getElementById('modalContent');
             
-            if (saldo >= meta) {
+            if (exito) {
                 modalIcon.className = 'fas fa-check-circle modal-icon';
-                modalTitle.textContent = '🎉 Se alcanzara la Meta En:';
+                modalTitle.textContent = '🎉 Meta Alcanzada';
                 modalContent.innerHTML = `
-                    <p><strong>${dia}</strong> días</p>
+                    <p><strong>${dias}</strong> días requeridos</p>
                     <p>Saldo final: <strong>${formatearMonedaTabla(saldo)}</strong></p>
                 `;
             } else {
@@ -857,54 +1080,36 @@
                 modalContent.innerHTML = `
                     <p>Límite de <strong>${maxDias}</strong> días</p>
                     <p>Saldo final: <strong>${formatearMonedaTabla(saldo)}</strong></p>
-                    <p style="color: #e53e3e; margin-top: 1rem;">
+                    <p style="color: var(--error); margin-top: 1rem;">
                         <i class="fas fa-exclamation-triangle"></i> Considera aumentar tu inversión
                     </p>
                 `;
             }
             showModal();
         }
-
-        // Selector de vistas
-        document.querySelectorAll('.view-button').forEach(button => {
-            button.addEventListener('click', () => {
-                if(!hasCalculations) return;
-                
-                const view = button.dataset.view;
-                document.querySelectorAll('.view-button').forEach(b => b.classList.remove('active'));
-                button.classList.add('active');
-                
-                document.getElementById('tablaResultados').style.display = view === 'tabla' ? 'block' : 'none';
-                document.getElementById('graficoVariacion').style.display = view === 'grafico' ? 'block' : 'none';
-            });
-        });
-
-        // Formatear moneda para la tabla
-        function formatearMonedaTabla(valor) {
-            return valor.toLocaleString('es-CO', {
-                style: 'currency',
-                currency: 'COP',
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-            });
-        }
-
-        // Manejo del modal
+        
         function showModal() {
             document.getElementById('modalOverlay').style.display = 'flex';
         }
-
+        
         function closeModal() {
             document.getElementById('modalOverlay').style.display = 'none';
         }
-
+        
+        function showLoader() {
+            document.getElementById('loadingSpinner').style.display = 'block';
+        }
+        
+        function hideLoader() {
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+        
         document.getElementById('modalOverlay').addEventListener('click', (e) => {
             if(e.target === document.getElementById('modalOverlay')) closeModal();
         });
-
+        
         document.addEventListener('keydown', (e) => {
             if(e.key === 'Escape') closeModal();
-        });
-    </script>
+        });</script>
 </body>
 </html>
